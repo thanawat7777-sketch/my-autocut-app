@@ -59,7 +59,7 @@ def get_capcut_draft_path():
 
 # ----------------- 1. เจนเนอเรตแผนคอนเทนต์ด้วย LLM -----------------
 def generate_all_30_plans(niche: str, audience: str, api_key: str):
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(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)
     prompt = f"""
     คุณเป็น Creative Director & Video Script Strategist สำหรับวิดีโอสั้นแนวตั้ง (TikTok, Reels, Shorts)
     สินค้า/หัวข้อหลัก: "{niche}"
