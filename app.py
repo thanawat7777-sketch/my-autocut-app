@@ -4,7 +4,7 @@ import uuid
 import platform
 import pandas as pd
 import streamlit as st
-from faster_whisper import WhisperModel
+
 from openai import OpenAI
 
 # ----------------- 30 หมวดหมู่วิดีโอยอดนิยม -----------------
