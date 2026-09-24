@@ -64,7 +64,7 @@ def generate_all_30_plans(niche: str, audience: str, api_key: str):
     คุณเป็น Creative Director & Video Script Strategist สำหรับวิดีโอสั้นแนวตั้ง (TikTok, Reels, Shorts)
     สินค้า/หัวข้อหลัก: "{niche}"
     กลุ่มเป้าหมาย: "{audience}"
-
+    return json.loads(response.choices.message.content).get("plans", [])
     จงคิดไอเดียคอนเทนต์วิดีโอให้ครบทั้ง 30 แนวต่อไปนี้:
     {json.dumps([g['name'] for g in VIDEO_GENRES_30], ensure_ascii=False)}
 
