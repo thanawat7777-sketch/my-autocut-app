@@ -4,8 +4,14 @@ import uuid
 import platform
 import pandas as pd
 import streamlit as st
-
 from openai import OpenAI
+
+# ตรวจสอบการโหลด faster_whisper เพื่อให้ระบบรันบน Cloud/มือถือ ได้อย่างปลอดภัย
+try:
+    from faster_whisper import WhisperModel
+    HAS_WHISPER = True
+except ModuleNotFoundError:
+    HAS_WHISPER = False
 
 # ----------------- 30 หมวดหมู่วิดีโอยอดนิยม -----------------
 VIDEO_GENRES_30 = [
@@ -26,7 +32,7 @@ VIDEO_GENRES_30 = [
     {"id": 15, "name": "พากิน / รีวิวร้านเด็ด (Foodie & Dining)", "desc": "ช็อตอาหารน่ากิน ASMR เสียงเคี้ยว/ปรุง"},
     {"id": 16, "name": "ออกกำลังกาย / ปั้นหุ่น (Fitness & Workout)", "desc": "ท่าทำตามง่าย มีตัวจับเวลานับถอยหลัง"},
     {"id": 17, "name": "ทำอาหารสุขภาพ / ลดน้ำหนัก (Healthy Cooking)", "desc": "แจกสูตรคลีน บอกแคลอรี Top-down view"},
-    {"id": 18, "name": "สกินแคร์ / รักษาสิว / บิวตี้ (Beauty & Care)", "desc": "บอกส่วนผสม เตือนข้อห้าม โชว์ผิวจริง"},
+    {"id": 18, "name": "สกินケア / รักษาสิว / บิวตี้ (Beauty & Care)", "desc": "บอกส่วนผสม เตือนข้อห้าม โชว์ผิวจริง"},
     {"id": 19, "name": "จัดโต๊ะคอม / แต่งห้องมินิมอล (Room Setup)", "desc": "Before vs After ป้ายยาไอเทมแต่งห้อง"},
     {"id": 20, "name": "ปรับลุค / การแต่งตัว (Fashion & Grooming)", "desc": "กฎจับคู่สี เทคนิคแต่งตัวให้ดูสูง/ดูแพง"},
     {"id": 21, "name": "สัตว์เลี้ยงแสนรู้ / ตลกน่ารัก (Cute Pets)", "desc": "พากย์เสียงสัตว์ ช็อตซูมหน้าเรียกรอยยิ้ม"},
@@ -83,7 +89,10 @@ def generate_all_30_plans(niche: str, audience: str, api_key: str):
 
 # ----------------- 2. ตัดต่อและสร้างโปรเจกต์ CapCut -----------------
 def process_video_and_build_draft(video_path: str, project_name: str, hook_text: str, heading_text: str):
-    # 1. รัน Faster-Whisper + VAD ตัด Dead Air
+    if not HAS_WHISPER:
+        raise ValueError("ระบบ Cloud ออนไลน์ไม่รองรับฟังก์ชันตัดต่อวิดีโออัตโนมัติ กรุณารันใช้งานแอปนี้ในเครื่องคอมพิวเตอร์ของคุณแทนครับ")
+
+    # รัน Faster-Whisper + VAD ตัด Dead Air
     model = WhisperModel("small", device="cpu", compute_type="int8")
     segments, _ = model.transcribe(
         video_path,
@@ -101,7 +110,6 @@ def process_video_and_build_draft(video_path: str, project_name: str, hook_text:
     if not transcript:
         raise ValueError("ไม่พบเสียงพูดในคลิป หรือเสียงเบาเกินไป")
 
-    # 2. เตรียมโฟลเดอร์ CapCut Draft
     base_dir = get_capcut_draft_path()
     os.makedirs(base_dir, exist_ok=True)
     draft_id = str(uuid.uuid4()).upper()
@@ -118,7 +126,6 @@ def process_video_and_build_draft(video_path: str, project_name: str, hook_text:
         dur_us = int((item["end"] - item["start"]) * 1_000_000)
         src_start_us = int(item["start"] * 1_000_000)
 
-        # Video track (กระโดดข้าม Dead Air)
         video_segments.append({
             "id": str(uuid.uuid4()),
             "material_id": video_material_id,
@@ -126,7 +133,6 @@ def process_video_and_build_draft(video_path: str, project_name: str, hook_text:
             "target_timerange": {"start": current_timeline_us, "duration": dur_us}
         })
 
-        # Subtitle track (Noto Sans Thai)
         t_id = str(uuid.uuid4())
         text_materials.append({
             "id": t_id,
@@ -141,7 +147,6 @@ def process_video_and_build_draft(video_path: str, project_name: str, hook_text:
 
         current_timeline_us += dur_us
 
-    # 3. ใส่ Hook Text (ช่วง 0-3 วินาทีแรก)
     if hook_text:
         h_id = str(uuid.uuid4())
         text_materials.append({
@@ -155,7 +160,6 @@ def process_video_and_build_draft(video_path: str, project_name: str, hook_text:
             "target_timerange": {"start": 0, "duration": min(3_000_000, current_timeline_us)}
         })
 
-    # 4. ใส่ Heading Card ไฮไลต์ (ช่วงกลางคลิป)
     if heading_text and current_timeline_us > 4_000_000:
         card_id = str(uuid.uuid4())
         text_materials.append({
@@ -169,7 +173,6 @@ def process_video_and_build_draft(video_path: str, project_name: str, hook_text:
             "target_timerange": {"start": 3_500_000, "duration": min(4_000_000, current_timeline_us - 3_500_000)}
         })
 
-    # 5. ประกอบ draft_content.json
     draft_data = {
         "id": draft_id,
         "name": project_name,
